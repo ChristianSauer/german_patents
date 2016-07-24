@@ -1,9 +1,12 @@
 import os
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 import plotly.offline as py
 import sys
+
+NUM_PATENTS_COL = "Number of Patents"
 
 CITY_COL = "City"
 
@@ -52,7 +55,6 @@ def extract_city(row):
 
 
 def extract_plz(row):
-
     adress = row["Inventors_0_Address"]
 
     if not isinstance(adress, str):
@@ -76,6 +78,52 @@ def main():
     df = _cleanup_data(df)
 
     plot_plz_freq(df)
+
+    directory = os.path.dirname(path)
+    write_grouped_information(df, directory)
+
+
+def write_grouped_information(df, path):
+    relevant_subset = [PLZ_COL, CITY_COL]
+    df = df[relevant_subset]
+    df[NUM_PATENTS_COL] = 1
+
+    write_by_plz(df, path)
+
+    write_by_city(df, path)
+
+
+def write_by_city(df, path):
+    by_city_path = os.path.join(path, "by_city.csv")
+    print("Writing City Information into the file {}".format(by_city_path))
+
+    by_city = df.groupby(CITY_COL)
+    city_df = by_city.agg({NUM_PATENTS_COL: np.sum,
+                           PLZ_COL: lambda x: ", ".join(np.unique(x[x.notnull()]))})
+
+    city_df.to_csv(by_city_path, sep=";")
+
+
+def write_by_plz(df, path):
+    by_plz_path = os.path.join(path, "by_plz.csv")
+    print("Writing PLZ Information into the file {}".format(by_plz_path))
+
+    by_plz = df.groupby(PLZ_COL)
+    plz_df = by_plz.agg({NUM_PATENTS_COL: np.sum,
+                         CITY_COL: _city_information_to_str})
+
+    plz_df.to_csv(by_plz_path, sep=";")
+
+
+def _city_information_to_str(col):
+    try:
+        unique_names = np.unique(col[col.notnull()])
+        if len(unique_names) == 0:
+            return "Kein Statdname!"
+        rv = ", ".join(unique_names)
+    except Exception:
+        return "Hello"
+    return rv
 
 
 def plot_plz_freq(df):
